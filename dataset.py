@@ -4,6 +4,8 @@ from torch.utils.data import Dataset
 from typing import List
 import skimage.io as io
 from odom_utils import get_calibration
+import torch
+import torchvision.transforms.functional as tviz_fun
 
 # Ignore warnings
 import warnings
@@ -28,6 +30,7 @@ class KittiVLOdomDataset(Dataset):
             root_dir (string): Root KITTI directory (dataset).
         """
         self.root_dir = root_dir
+        self.annotated = annotated
 
         # Initialize sequences information
         seq_path = os.path.join(root_dir, "sequences")
@@ -93,12 +96,12 @@ class KittiVLOdomDataset(Dataset):
             diff_gt_poses_path = os.path.join(
                 seq_path, _seq_name, diff_gt_poses_filename
             )
-            if annotated and (not os.path.isfile(diff_gt_poses_path)):
+            if self.annotated and (not os.path.isfile(diff_gt_poses_path)):
                 raise RuntimeError(
                     f"Differential gt poses do not exist: {diff_gt_poses_path}!"
                 )
             self.seqs_info[_seq_name]["diff_gt_poses"] = (
-                np.load(diff_gt_poses_path) if annotated else None
+                np.load(diff_gt_poses_path) if self.annotated else None
             )
 
             self.seqs_info[_seq_name]["len"] = (
@@ -125,22 +128,50 @@ class KittiVLOdomDataset(Dataset):
         img1_prev = io.imread(
             os.path.join(_seq_info["img1_path"], str(seq_idx).zfill(6)) + ".png"
         )
-        pcd_prev = np.fromfile(
-            os.path.join(_seq_info["pcd_path"], str(seq_idx).zfill(6)) + ".bin",
-            dtype=np.float32,
-        ).reshape(-1, 4)
+        # pcd_prev = np.fromfile(
+        #     os.path.join(_seq_info["pcd_path"], str(seq_idx).zfill(6)) + ".bin",
+        #     dtype=np.float32,
+        # ).reshape(-1, 4)
         img0_curr = io.imread(
             os.path.join(_seq_info["img0_path"], str(seq_idx + 1).zfill(6)) + ".png"
         )
         img1_curr = io.imread(
             os.path.join(_seq_info["img1_path"], str(seq_idx + 1).zfill(6)) + ".png"
         )
-        pcd_curr = np.fromfile(
-            os.path.join(_seq_info["pcd_path"], str(seq_idx).zfill(6)) + ".bin",
-            dtype=np.float32,
-        ).reshape(-1, 4)
+        # pcd_curr = np.fromfile(
+        #     os.path.join(_seq_info["pcd_path"], str(seq_idx).zfill(6)) + ".bin",
+        #     dtype=np.float32,
+        # ).reshape(-1, 4)
+        # print(img0_prev.shape, img1_prev.shape)
 
-        return None
+        sample = {
+            "img0_prev": tviz_fun.resize(
+                torch.from_numpy(img0_prev.astype(np.float32)).repeat(3, 1, 1) / 255,
+                (376, 1241),
+            ),
+            "img1_prev": tviz_fun.resize(
+                torch.from_numpy(img1_prev.astype(np.float32)).repeat(3, 1, 1) / 255,
+                (376, 1241),
+            ),
+            "img0_curr": tviz_fun.resize(
+                torch.from_numpy(img0_curr.astype(np.float32)).repeat(3, 1, 1) / 255,
+                (376, 1241),
+            ),
+            "img1_curr": tviz_fun.resize(
+                torch.from_numpy(img1_curr.astype(np.float32)).repeat(3, 1, 1) / 255,
+                (376, 1241),
+            ),
+            "kiss_prior": torch.from_numpy(
+                _seq_info["diff_kiss_poses"][seq_idx].astype(np.float32)
+            ),  # assume it is in camera frame
+            "gt": (
+                torch.from_numpy(_seq_info["diff_gt_poses"][seq_idx].astype(np.float32))
+                if self.annotated
+                else None
+            ),
+        }
+
+        return sample
 
 
 if __name__ == "__main__":
