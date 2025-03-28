@@ -175,4 +175,5 @@ cython_debug/
 
 data
 logs
-*.pt
+*.pth
+checkpoints

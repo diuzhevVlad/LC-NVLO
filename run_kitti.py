@@ -8,7 +8,7 @@ import torch
 import tqdm
 
 path = "data/SemanticKITTI/dataset"
-dataset = KittiVLOdomDataset(path, sequences_to_load=["06"])
+dataset = KittiVLOdomDataset(path, sequences_to_load=["05"])
 loader = DataLoader(
     dataset,
     batch_size=14,
@@ -18,7 +18,7 @@ loader = DataLoader(
 )
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 model = SimpleStereoPoseNet(pretrained=False)
-checkpoint = torch.load("checkpoint_epoch_1.pth")
+checkpoint = torch.load("checkpoints/checkpoint_epoch_9.pth")
 model.load_state_dict(checkpoint["model_state_dict"])
 model.to(device)
 model.eval()
